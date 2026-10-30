@@ -129,13 +129,42 @@
 
   /* ============================================================ 更新检查 */
 
-  const APP_VERSION = '0.1.3';
-  // 走 GitHub contents API 取 version.json：实时无缓存、带 CORS，比 raw 域名稳定
-  const UPDATE_URL = 'https://api.github.com/repos/longchangjin2-arch/fontstudio/contents/version.json';
+  const APP_VERSION = '0.1.4';
+  // 更新检查走多个源，任一可用即可（国内优先 Gitee，境外/备用 GitHub 与 Cloudflare）
+  const UPDATE_SOURCES = [
+    'https://gitee.com/api/v5/repos/i-dont-want-to-pick-a-name/fontstudio/contents/version.json?ref=master',
+    'https://api.github.com/repos/longchangjin2-arch/fontstudio/contents/version.json',
+    'https://fontstudio.3772387377.workers.dev/version.json',
+  ];
 
   function b64ToUtf8(b64) {
     const bytes = Uint8Array.from(atob(String(b64).replace(/\s/g, '')), c => c.charCodeAt(0));
     return new TextDecoder().decode(bytes);
+  }
+
+  /** 从各个源挨个取 version.json，返回第一个成功的结果 */
+  async function fetchVersionInfo() {
+    let lastErr = null;
+    for (const url of UPDATE_SOURCES) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      try {
+        const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store' });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const payload = await res.json();
+        // Gitee / GitHub contents API 返回 { content: base64 }；纯 JSON 源直接是对象
+        const info = typeof payload.content === 'string'
+          ? JSON.parse(b64ToUtf8(payload.content))
+          : payload;
+        if (info && info.version) return info;
+        throw new Error('bad payload');
+      } catch (err) {
+        clearTimeout(timer);
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('no source');
   }
 
   /** 语义化版本比较：a > b 返回 true */
@@ -160,7 +189,7 @@
     } else {
       link.style.display = 'none';
     }
-    $('updFoot').textContent = `当前版本 v${APP_VERSION} · 更新包托管于 GitHub Releases`;
+    $('updFoot').textContent = `当前版本 v${APP_VERSION} · 更新包托管于 Gitee Releases`;
     const dlg = $('dlgUpdate');
     if (!dlg.open) dlg.showModal();
   }
@@ -168,16 +197,7 @@
   /** manual=true 时给反馈；启动自动检查时静默失败 */
   async function checkUpdate(manual) {
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 6000);
-      const res = await fetch(UPDATE_URL, { signal: ctrl.signal, cache: 'no-store' });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const payload = await res.json();
-      // contents API 返回 { content: base64 }；raw json 则直接是对象
-      const info = typeof payload.content === 'string'
-        ? JSON.parse(b64ToUtf8(payload.content))
-        : payload;
+      const info = await fetchVersionInfo();
       if (!isNewer(info.version, APP_VERSION)) {
         if (manual) toast(`已是最新版本 v${APP_VERSION}`);
         return;

@@ -1,0 +1,7 @@
+{
+  "version": "0.1.4",
+  "notes": "更新检查改用国内通道：Gitee 优先，GitHub / Cloudflare 自动兜底；v0.1.2 起定位为通用字体设计器，默认画布 64×64，可选 8~128。",
+  "apkUrl": "https://gitee.com/i-dont-want-to-pick-a-name/fontstudio/releases/download/v0.1.4/FontStudio-v0.1.4.apk",
+  "exeUrl": "https://gitee.com/i-dont-want-to-pick-a-name/fontstudio/releases/download/v0.1.4/FontStudio-0.1.4-win.exe",
+  "homeUrl": "https://fontstudio.3772387377.workers.dev/"
+}

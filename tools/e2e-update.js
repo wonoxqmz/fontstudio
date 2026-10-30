@@ -3,7 +3,8 @@
 const CHROME = 'C:/Users/LCJ/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe';
 const { chromium } = require('playwright-core');
 
-const API = 'https://api.github.com/repos/longchangjin2-arch/fontstudio/contents/version.json';
+// 首选源：Gitee API（另外两源默认走网络，测试里不 mock）
+const API = 'https://gitee.com/api/v5/repos/i-dont-want-to-pick-a-name/fontstudio/contents/version.json?ref=master';
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {
   if (cond) { pass++; console.log('  [PASS]', name); }

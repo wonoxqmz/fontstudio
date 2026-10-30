@@ -2,9 +2,10 @@
 
 一款本地运行的通用字体设计器：选 Unicode 码位 → 手绘 / 导入图片设计字形 → 自动矢量化 → 导出 TTF 字体。高分辨率网格绘制，输出是平滑矢量轮廓，不是马赛克像素块。
 
-> 当前版本 v0.1.3 —— 三端齐发：网页版 / Windows exe / Android APK（共用同一套 JS 内核）
+> 当前版本 v0.1.4 —— 三端齐发：网页版 / Windows exe / Android APK（共用同一套 JS 内核）
 >
-> 仓库与更新包：https://github.com/longchangjin2-arch/fontstudio
+> Gitee 仓库：https://gitee.com/i-dont-want-to-pick-a-name/fontstudio
+> 下载页（Cloudflare Worker）：https://fontstudio.3772387377.workers.dev/
 
 ## 三端
 
@@ -12,7 +13,7 @@
 | --- | --- | --- |
 | 网页版 | `index.html` 双击即用 | Chrome / Edge 等现代浏览器，无需服务器 |
 | Windows | `desktop/dist/字形工坊.exe` | pywebview 薄壳（Edge WebView2），单文件 7.9MB，免安装 |
-| Android | `android/FontStudio-v0.1.3.apk` | WebView 壳，minSdk 19；建议 Android 5+ 并保持系统 WebView 较新 |
+| Android | `android/FontStudio-v0.1.4.apk` | WebView 壳，minSdk 19；建议 Android 5+ 并保持系统 WebView 较新 |
 
 三端共用 `index.html + js/ + css/` 这一套内核：改一处三端同步。安卓端通过
 `AndroidBridge` 原生桥实现文件保存（SAF 免权限）与项目打开；Windows 端下载走
@@ -33,8 +34,28 @@
   - `.zip` 全套打包：TTF + WOFF + BDF + 双击即看的字体预览页 + 说明
   - `.fontproj` 项目文件（JSON），随时保存/继续编辑
 - **自动保存**：编辑内容实时存入浏览器 localStorage，误关不丢；保存失败会在顶部给出提示条
-- **更新检查**：启动时静默检查一次，设置面板里也有「检查更新」按钮；发现新版本会弹窗附下载链接（更新包托管在 GitHub Releases）
+- **更新检查**：启动时静默检查一次，设置面板里也有「检查更新」按钮；发现新版本会弹窗附下载链接。检查走三条源自动兜底：**Gitee API（国内首选）→ GitHub API → Cloudflare Worker**，任一可用即可
 - **快捷键**：工具栏「?」可查全部快捷键；Ctrl+Z / Ctrl+Y 撤销重做、Ctrl+S 保存项目、数字键切工具
+
+## 发布与更新链路
+
+```
+源码仓库        Gitee  fontstudio（主）           GitHub  fontstudio（镜像）
+安装包          Gitee Releases 附件               GitHub Releases 副本
+版本清单        Gitee 仓库根目录 version.json（客户端读它）
+客户端检查      Gitee API → GitHub API → Cloudflare Worker（依次兜底）
+下载页/网关     Cloudflare Worker: fontstudio.<子域>.workers.dev
+                /version.json 代理 Gitee 版本清单（加 CORS，境外可用）
+                /apk /exe     302 到对应安装包
+                /             简易下载页
+```
+
+发新版流程：
+
+1. 改 `js/app.js` 里的 `APP_VERSION` 与 `android/build.sh` 的版本号，打包 APK / exe
+2. 上传到 Gitee Releases（`tools/gitee_release.py`）
+3. 把仓库根目录 `version.json` 的 `version` / `notes` / 两个 URL 改成新版本，git push
+4. 客户端下次启动即提示更新（Worker 与 GitHub 镜像无需改动）
 
 ## 目录结构
 
@@ -106,6 +127,12 @@ cd android && bash build.sh
 LCJ · 3772387377@qq.com
 
 ## 更新日志
+
+### v0.1.4 (2026-10-30) —— 托管迁移到国内（Gitee + Cloudflare）
+- 源码与安装包迁移到 Gitee：仓库、Release 附件均可在国内直连下载；GitHub 保留为镜像
+- 更新检查改为三源兜底：Gitee OpenAPI（`Access-Control-Allow-Origin: *`，匿名可读、国内快）→ GitHub API → Cloudflare Worker，某一源失败自动换下一个
+- 部署 Cloudflare Worker 作为下载网关：`/version.json` 代理 Gitee 版本清单并补 CORS，`/apk` `/exe` 302 跳转安装包，`/` 提供下载页
+- 版本清单唯一来源改为 Gitee 仓库根目录 `version.json`，发版只需改这一个文件
 
 ### v0.1.3 (2026-10-18) —— 更新检查
 - 新增更新检查：启动 4 秒后静默查一次 `version.json`（GitHub raw），有新版弹窗提示并附下载链接；设置面板里有「检查更新」按钮可手动查
