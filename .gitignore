@@ -1,0 +1,10 @@
+_build/
+desktop/build/
+desktop/dist/
+android/build/
+android/assets/
+android/keystore/
+android/*.apk
+__pycache__/
+*.pyc
+*.log
