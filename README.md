@@ -1,8 +1,8 @@
 # 字形工坊（Font Studio）
 
-一款本地运行的通用字体设计器：选 Unicode 码位 → 手绘 / 导入图片设计字形 → 自动矢量化 → 导出 TTF 字体。高分辨率网格绘制，输出是平滑矢量轮廓，不是马赛克像素块。
+一款本地运行的通用字体设计器：选 Unicode 码位 → 手绘 / 导入图片 / **导入现成字体** → 自动矢量化 → 导出 TTF 字体。高分辨率网格绘制，输出是平滑矢量轮廓，不是马赛克像素块。
 
-> 当前版本 v0.1.4 —— 三端齐发：网页版 / Windows exe / Android APK（共用同一套 JS 内核）
+> 当前版本 v0.1.5 —— 三端齐发：网页版 / Windows exe / Android APK（共用同一套 JS 内核）
 >
 > Gitee 仓库：https://gitee.com/i-dont-want-to-pick-a-name/fontstudio
 > 下载页（Cloudflare Worker）：https://fontstudio.3772387377.workers.dev/
@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | 网页版 | `index.html` 双击即用 | Chrome / Edge 等现代浏览器，无需服务器 |
 | Windows | `desktop/dist/字形工坊.exe` | pywebview 薄壳（Edge WebView2），单文件 7.9MB，免安装 |
-| Android | `android/FontStudio-v0.1.4.apk` | WebView 壳，minSdk 19；建议 Android 5+ 并保持系统 WebView 较新 |
+| Android | `android/FontStudio-v0.1.5.apk` | WebView 壳，minSdk 19；建议 Android 5+ 并保持系统 WebView 较新 |
 
 三端共用 `index.html + js/ + css/` 这一套内核：改一处三端同步。安卓端通过
 `AndroidBridge` 原生桥实现文件保存（SAF 免权限）与项目打开；Windows 端下载走
@@ -24,6 +24,11 @@
 - **Unicode 字形编辑**：支持单字符（`中`）、码位（`U+4E2D`）两种输入方式；支持粘贴一段文本批量提取字符；内置 ASCII / 常用标点 / 数字 / 常用汉字预设
 - **自由绘制**：画笔、橡皮、直线、矩形、椭圆、油漆桶、吸管；镜像 / 翻转 / 旋转 / 平移；复制粘贴字形；多级撤销重做
 - **图片导入**：自动去白底（亮度阈值 / Otsu 自动阈值）、反色、保持比例、轻微模糊、去噪，一键把图片转成字形
+- **字体导入**（顶栏「⤓ 导入字体」）：直接加载现成字体文件继续改——
+  - 支持 `.ttf` / `.ttc`（取第一个字体）/ `.woff` / `.bdf` 点阵
+  - TrueType 轮廓（含复合字形）自动栅格化到画布网格，扫描线填充带 3×3 超采样抗锯齿
+  - 可选导入范围（全部 / ASCII / 自定义字符）、数量上限、网格尺寸、是否覆盖已有字形
+  - 自动沿用源字体的 UPM、基线比例、家族名 / 版权等元数据；字宽从 hmtx / DWIDTH 读入
 - **矢量内核**：位图自动矢量化（8 连通轮廓追踪 + Douglas-Peucker 简化 + 可选顶角圆滑），画布实时叠加矢量轮廓预览，矢量锚点符合 TrueType 规范（外轮廓顺时针、内孔逆时针）
 - **字体参数**：家族名 / 样式名 / 版权 / 设计者 / UPM（1000-2048）/ 字重 / 基线行 / 等宽标记等全套元数据
 - **网格尺寸**：8×8 到 128×128，默认 64×64 —— 网格越细，矢量化后的字形越平滑；16 以下的粗网格适合点阵风字体
@@ -67,6 +72,7 @@
 │   ├── vectorize.js    # 位图矢量化内核（轮廓追踪 / 简化 / 圆滑 / 图片二值化）
 │   ├── ttf.js          # TrueType + WOFF 生成内核（纯 JS，零依赖）
 │   ├── exporters.js    # BDF 点阵 / ZIP 打包 / 字体预览页生成
+│   ├── fontimport.js   # 字体导入内核（TTF/TTC/WOFF/BDF 解析 → 栅格化到网格）
 │   └── app.js          # UI 逻辑
 ├── desktop/
 │   ├── main.py         # Windows 壳入口（pywebview）
@@ -85,6 +91,9 @@
 │   ├── e2e-mobile.js   # 移动端 400×780 触摸绘制与面板切换
 │   ├── e2e-fixes.js    # 回归用例（确认框 / 删除选中 / 跨字形撤销 / 断笔 / 中文名 / 帮助）
 │   ├── e2e-update.js   # 更新检查流程（mock 版本号 / 弹窗 / 手动检查）
+│   ├── e2e-update-live.js # 更新检查真实网络验证（Gitee 线上源）
+│   ├── e2e-fontimport.js  # 字体导入全流程（TTF/BDF/覆盖开关/自定义范围/再导出）
+│   ├── test-fontimport.js # 导入内核单测（含真实系统字体）
 │   └── shot.js         # 通用网页截图工具
 └── _build/             # 测试产物输出目录
 ```
@@ -127,6 +136,15 @@ cd android && bash build.sh
 LCJ · 3772387377@qq.com
 
 ## 更新日志
+
+### v0.1.5 (2026-11-14) —— 导入现成字体
+- 新增「⤓ 导入字体」：加载 `.ttf` / `.ttc` / `.woff` / `.bdf` 现成字体文件，把字形栅格化到画布网格后继续编辑
+- TrueType 轮廓解码支持简单字形 + 复合字形（递归展开组件与 2×2 变换矩阵），cmap 支持 format 4 / 12 / 6 / 0
+- 扫描线非零环绕填充 + 3×3 超采样，导入的字形边缘平滑；基线按源字体 ascender/descender 比例自动落位
+- 导入选项：全部字符 / ASCII / 自定义字符、数量上限（默认 300，防大字库卡顿）、画布网格、覆盖已有字形开关
+- 自动沿用源字体元数据（家族名 / 版权 / 设计者 / UPM 等），字宽从 hmtx 读入
+- 真实字体验证：Arial（复合字形）、SimHei（中文渲染正确）、Microsoft YaHei（.ttc 集合）均通过；自研字体导出→导入往返 7/7 位图完全一致
+- GitHub 镜像迁移到新账号
 
 ### v0.1.4 (2026-10-30) —— 托管迁移到国内（Gitee + Cloudflare）
 - 源码与安装包迁移到 Gitee：仓库、Release 附件均可在国内直连下载；GitHub 保留为镜像

@@ -50,8 +50,8 @@ echo "==> 2/8 aapt2 link"
   --java "$OUT/gen" \
   --min-sdk-version 19 \
   --target-sdk-version 28 \
-  --version-code 5 \
-  --version-name 0.1.4 \
+  --version-code 6 \
+  --version-name 0.1.5 \
   --auto-add-overlay
 
 echo "==> 3/8 javac (against android-19)"
@@ -91,10 +91,10 @@ fi
 "$JAVA" -jar "$BT/lib/apksigner.jar" sign \
   --ks "$KS" --ks-pass "pass:$KSPASS" --key-pass "pass:$KSPASS" \
   --min-sdk-version 19 --v1-signing-enabled true --v2-signing-enabled true \
-  --out "$NAME-v0.1.4.apk" "$OUT/aligned.apk"
+  --out "$NAME-v0.1.5.apk" "$OUT/aligned.apk"
 
 echo "==> 8/8 verify"
-"$JAVA" -jar "$BT/lib/apksigner.jar" verify --min-sdk-version 19 --print-certs "$NAME-v0.1.4.apk" 2>/dev/null | head -6
-"$BT/aapt2.exe" dump badging "$NAME-v0.1.4.apk" | head -5
-ls -l "$NAME-v0.1.4.apk"
+"$JAVA" -jar "$BT/lib/apksigner.jar" verify --min-sdk-version 19 --print-certs "$NAME-v0.1.5.apk" 2>/dev/null | head -6
+"$BT/aapt2.exe" dump badging "$NAME-v0.1.5.apk" | head -5
+ls -l "$NAME-v0.1.5.apk"
 echo "==> DONE"

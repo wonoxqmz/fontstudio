@@ -103,3 +103,9 @@ fs.mkdirSync(outDir, { recursive: true });
 const outPath = path.join(outDir, 'VectorTest.ttf');
 fs.writeFileSync(outPath, Buffer.from(ttf));
 console.log('\n写入:', outPath, ttf.length, 'bytes');
+
+// 导出源位图供 fontimport 往返测试
+fs.writeFileSync(path.join(outDir, 'bmp.json'), JSON.stringify(
+  cases.map(([code, bmp]) => [code, { bmp: Array.from(bmp), w: N, h: N, bl: baselineRow }])
+));
+console.log('写入:', path.join(outDir, 'bmp.json'));

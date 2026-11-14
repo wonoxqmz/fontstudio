@@ -22,6 +22,7 @@
     <button id="btnSettings" class="tbtn" title="字体全局设置">⚙ 设置</button>
     <button id="btnSave" class="tbtn" title="保存项目为 JSON">💾 保存项目</button>
     <button id="btnLoad" class="tbtn" title="加载项目 JSON">📂 打开项目</button>
+    <button id="btnFontImport" class="tbtn" title="从 TTF / WOFF / BDF 字体文件导入字形，可继续编辑">⤓ 导入字体</button>
     <div class="dd">
       <button id="btnExport" class="tbtn primary">⬇ 导出 ▾</button>
       <div class="dd-menu" id="exportMenu">
@@ -217,6 +218,43 @@
   <p class="dlg-foot" id="updFoot"></p>
 </dialog>
 
+<!-- ======================= 字体导入弹窗 ======================= -->
+<dialog id="dlgFontImport" class="dlg">
+  <form method="dialog">
+    <h3>导入字体文件</h3>
+    <p id="fiInfo" class="fi-info">—</p>
+    <div class="dlg-grid">
+      <label>画布网格
+        <select id="fiGrid">
+          <option value="16">16 × 16</option>
+          <option value="24">24 × 24</option>
+          <option value="32">32 × 32</option>
+          <option value="48">48 × 48</option>
+          <option value="64">64 × 64</option>
+          <option value="96">96 × 96</option>
+          <option value="128">128 × 128</option>
+        </select>
+      </label>
+      <label>导入范围
+        <select id="fiRange">
+          <option value="all">全部字符</option>
+          <option value="ascii">ASCII（字母数字标点）</option>
+          <option value="custom">自定义字符…</option>
+        </select>
+      </label>
+      <label>数量上限<input id="fiCap" type="number" value="300" min="1" max="2000"></label>
+      <label id="fiCustomRow" style="display:none">自定义字符<input id="fiCustom" type="text" placeholder="输入要导入的字符，如 abc123"></label>
+    </div>
+    <label class="fi-chk"><input type="checkbox" id="fiMeta" checked> 应用该字体的信息（家族名 / 版权 / UPM 等）</label>
+    <label class="fi-chk"><input type="checkbox" id="fiOverwrite" checked> 覆盖画布上已有的同名字形</label>
+    <div id="fiProg" class="fi-prog"></div>
+    <div class="dlg-actions">
+      <button type="button" id="fiCancel" class="tbtn">取消</button>
+      <button type="button" id="fiOk" class="tbtn primary">导入</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- ======================= 图片导入弹窗 ======================= -->
 <dialog id="dlgImport" class="dlg wide">
   <h3>导入图片到字形</h3>
@@ -294,7 +332,7 @@
   <div class="dlg-actions">
     <button type="button" id="btnHelpClose" class="tbtn primary">知道了</button>
   </div>
-  <p class="dlg-foot">字形工坊 v0.1.4 · 个人练手项目，功能持续迭代中</p>
+  <p class="dlg-foot">字形工坊 v0.1.5 · 个人练手项目，功能持续迭代中</p>
 </dialog>
 
 <div id="toast" class="toast"></div>
@@ -308,10 +346,12 @@
 </nav>
 
 <input id="fileProject" type="file" accept=".json,.fontproj" hidden>
+<input id="fontFile" type="file" accept=".ttf,.otf,.ttc,.woff,.bdf" hidden>
 
 <script src="js/vectorize.js"></script>
 <script src="js/ttf.js"></script>
 <script src="js/exporters.js"></script>
+<script src="js/fontimport.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

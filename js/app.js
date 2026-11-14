@@ -84,6 +84,11 @@
     saveWarn: $('saveWarn'),
     toast: $('toast'),
     fileProject: $('fileProject'),
+    btnFontImport: $('btnFontImport'), fontFile: $('fontFile'),
+    dlgFontImport: $('dlgFontImport'), fiInfo: $('fiInfo'), fiGrid: $('fiGrid'),
+    fiRange: $('fiRange'), fiCustomRow: $('fiCustomRow'), fiCustom: $('fiCustom'),
+    fiCap: $('fiCap'), fiMeta: $('fiMeta'), fiOverwrite: $('fiOverwrite'),
+    fiProg: $('fiProg'), fiOk: $('fiOk'), fiCancel: $('fiCancel'),
     btnUndo: $('btnUndo'), btnRedo: $('btnRedo'),
     btnMirrorH: $('btnMirrorH'), btnMirrorV: $('btnMirrorV'), btnRotate: $('btnRotate'),
     btnShiftL: $('btnShiftL'), btnShiftR: $('btnShiftR'),
@@ -127,9 +132,138 @@
     return `U+${code.toString(16).toUpperCase().padStart(4, '0')} ${String.fromCodePoint(code)}`;
   }
 
+  /* ============================================================ 字体文件导入 */
+
+  let pendingFont = null;   // FontImport.parse() 的结果，暂存于选择弹窗期间
+
+  async function openFontImport() {
+    els.fontFile.value = '';
+    els.fontFile.click();
+  }
+
+  els.fontFile.addEventListener('change', async () => {
+    const file = els.fontFile.files && els.fontFile.files[0];
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      pendingFont = await FontImport.parse(new Uint8Array(buf));
+    } catch (e) {
+      toast('导入失败：' + e.message);
+      return;
+    }
+    const nm = pendingFont.name || {};
+    const nChars = pendingFont.chars.size;
+    if (pendingFont.kind === 'bdf') {
+      els.fiInfo.textContent =
+        `${file.name} — BDF 点阵字体 · ${nm.family || ''} · ${nChars} 个字符 · ${pendingFont.pixelSize}px`;
+      // 点阵字体按原像素尺寸选最接近的网格
+      const opts = [...els.fiGrid.options].map(o => +o.value);
+      const best = opts.reduce((a, b) => Math.abs(b - pendingFont.pixelSize) < Math.abs(a - pendingFont.pixelSize) ? b : a);
+      els.fiGrid.value = String(best);
+    } else {
+      els.fiInfo.textContent =
+        `${file.name} — TrueType 字体 · ${nm.family || ''}${nm.subfamily ? ' ' + nm.subfamily : ''} · ` +
+        `${nChars} 个字符 · UPM ${pendingFont.upm}`;
+      els.fiGrid.value = String(state.project.grid.w);
+    }
+    els.fiRange.value = 'all';
+    els.fiCustomRow.style.display = 'none';
+    els.fiProg.textContent = '';
+    els.fiOk.disabled = false;
+    if (!els.dlgFontImport.open) els.dlgFontImport.showModal();
+  });
+
+  async function runFontImport() {
+    const font = pendingFont;
+    if (!font) return;
+    const n = +els.fiGrid.value || state.project.grid.w;
+    if (n !== state.project.grid.w) applyGridSize(n);   // 弹窗里已经确认过，直接切
+
+    if (font.kind === 'sfnt') {
+      // 基线按源字体的 ascender/descender 比例落位
+      const { ascender: asc, descender: desc } = font;
+      if (asc > 0 && desc < 0) {
+        state.project.font.baselineRow = Math.min(n - 1, Math.max(1, Math.round(n * asc / (asc - desc))));
+      }
+    }
+
+    // 码位筛选
+    let codes = [...font.chars.keys()].sort((a, b) => a - b);
+    const range = els.fiRange.value;
+    if (range === 'ascii') {
+      codes = codes.filter(c => c >= 0x20 && c <= 0x7e);
+    } else if (range === 'custom') {
+      const want = new Set();
+      for (const ch of els.fiCustom.value.trim()) want.add(ch.codePointAt(0));
+      codes = codes.filter(c => want.has(c));
+    }
+    const cap = Math.max(1, Math.min(2000, +els.fiCap.value || 300));
+    if (codes.length > cap) codes = codes.slice(0, cap);
+    if (!codes.length) { toast('没有可导入的字符'); return; }
+
+    const overwrite = els.fiOverwrite.checked;
+    const G = n;
+    const bl = state.project.font.baselineRow;
+    let done = 0, skipped = 0;
+    els.fiOk.disabled = true;
+
+    for (const code of codes) {
+      if (state.glyphs.has(code) && !overwrite) { skipped++; continue; }
+      try {
+        if (font.kind === 'bdf') {
+          const ch = font.chars.get(code);
+          const bmp = FontImport.bdfToGrid(ch, G, G, bl);
+          const adv = ch.dw != null && Math.round(ch.dw) !== G ? Math.round(ch.dw) : null;
+          state.glyphs.set(code, { code, bmp, advance: adv });
+        } else {
+          const r = FontImport.gridFromSfnt(font, code, G, G, bl);
+          if (!r) { skipped++; continue; }
+          const a = Math.round(r.advance * 2) / 2;
+          const adv = Math.abs(a - G) < 0.75 ? null : Math.min(a, G * 4);
+          state.glyphs.set(code, { code, bmp: r.bmp, advance: adv });
+        }
+        done++;
+      } catch (e) {
+        console.warn('glyph import failed', code, e);
+        skipped++;
+      }
+      if (done % 16 === 0) {
+        els.fiProg.textContent = `已导入 ${done} / ${codes.length}…`;
+        await new Promise(r => setTimeout(r, 0));   // 让出主线程刷新进度
+      }
+    }
+
+    // 应用源字体元数据
+    if (font.kind === 'sfnt' && els.fiMeta.checked) {
+      const f = state.project.font, nm = font.name || {};
+      if (nm.family) f.familyName = nm.family;
+      if (nm.subfamily) f.styleName = nm.subfamily;
+      if (nm.copyright) f.copyright = nm.copyright;
+      if (nm.designer) f.designer = nm.designer;
+      if (nm.manufacturer) f.manufacturer = nm.manufacturer;
+      if (nm.license) f.license = nm.license;
+      if (font.upm > 16) f.upm = font.upm;
+    } else if (font.kind === 'bdf' && els.fiMeta.checked && font.name && font.name.family) {
+      state.project.font.familyName = font.name.family;
+    }
+
+    els.fiOk.disabled = false;
+    els.fiProg.textContent = '';
+    els.dlgFontImport.close();
+    pendingFont = null;
+    els.fontFile.value = '';
+
+    // 选中第一个导入的字形
+    const first = codes.find(c => state.glyphs.has(c));
+    if (first != null) setCurrent(first);
+    renderAll();
+    scheduleSave();
+    toast(`已导入 ${done} 个字形${skipped ? `，跳过 ${skipped} 个` : ''}`);
+  }
+
   /* ============================================================ 更新检查 */
 
-  const APP_VERSION = '0.1.4';
+  const APP_VERSION = '0.1.5';
   // 更新检查走多个源，任一可用即可（国内优先 Gitee，境外/备用 GitHub 与 Cloudflare）
   const UPDATE_SOURCES = [
     'https://gitee.com/api/v5/repos/i-dont-want-to-pick-a-name/fontstudio/contents/version.json?ref=master',
@@ -1326,6 +1460,14 @@
     // 更新检查
     $('btnCheckUpd').onclick = () => { toast('正在检查更新…'); checkUpdate(true); };
     $('updClose').onclick = () => $('dlgUpdate').close();
+
+    // 字体文件导入
+    els.btnFontImport.onclick = openFontImport;
+    els.fiRange.onchange = () => {
+      els.fiCustomRow.style.display = els.fiRange.value === 'custom' ? '' : 'none';
+    };
+    els.fiOk.onclick = runFontImport;
+    els.fiCancel.onclick = () => els.dlgFontImport.close();
     // 安卓 WebView 里 target=_blank 开不了，走原生桥用系统浏览器打开
     $('updLink').addEventListener('click', (ev) => {
       const url = $('updLink').href;
@@ -1620,4 +1762,8 @@
   } else {
     init();
   }
+
+  // 调试 / 端到端测试钩子（不影响正常使用）
+  window.__fs = { state, applyGridSize, setCurrent };
+
 })();
